@@ -53,22 +53,12 @@
   .btn-off { background: var(--red-bg);   color: var(--red-text);   border-color: transparent; }
   .btn-mute-active { background: var(--orange-bg); color: var(--orange-text); border-color: transparent; }
   .btn-input-active { background: var(--blue-bg); color: var(--blue-text); border-color: transparent; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .span2 { grid-column: span 2; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   .vol-row { display: grid; grid-template-columns: 64px 1fr 64px; gap: 10px; align-items: center; }
   .vol-center { text-align: center; }
   .vol-num { font-size: 40px; font-weight: 200; line-height: 1; }
   .vol-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
   .btn-circle { width: 62px; height: 62px; border-radius: 50%; font-size: 24px; padding: 0; }
-  .vol-slider-wrap { margin-top: 14px; padding: 0 4px; }
-  input[type=range] {
-    width: 100%; height: 6px; -webkit-appearance: none; appearance: none;
-    background: var(--border); border-radius: 3px; outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%;
-    background: var(--blue); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  }
   #toast {
     position: fixed; bottom: calc(env(safe-area-inset-bottom, 16px) + 16px);
     left: 50%; transform: translateX(-50%);
@@ -89,7 +79,7 @@
 
 <p class="section-label">Power</p>
 <div class="card">
-  <div class="grid2">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
     <button class="btn btn-on"  onclick="setPower('poweron')">&#9211; On</button>
     <button class="btn btn-off" onclick="setPower('poweroff')">&#9211; Off</button>
   </div>
@@ -99,22 +89,17 @@
 <div class="card">
   <div class="vol-row">
     <button class="btn btn-circle"
-      onclick="nudgeVol(-1)"
-      onpointerdown="startRepeat(function(){ nudgeVol(-1); })"
+      onclick="sendVolDelta(-1)"
+      onpointerdown="startRepeat(function(){ sendVolDelta(-1); })"
       onpointerup="stopRepeat()" onpointerleave="stopRepeat()">&#8722;</button>
     <div class="vol-center">
       <div class="vol-num" id="vol-num">&#8212;</div>
       <div class="vol-sub">volume</div>
     </div>
     <button class="btn btn-circle"
-      onclick="nudgeVol(1)"
-      onpointerdown="startRepeat(function(){ nudgeVol(1); })"
+      onclick="sendVolDelta(1)"
+      onpointerdown="startRepeat(function(){ sendVolDelta(1); })"
       onpointerup="stopRepeat()" onpointerleave="stopRepeat()">+</button>
-  </div>
-  <div class="vol-slider-wrap">
-    <input type="range" id="vol-slider" min="0" max="100" value="50"
-      oninput="onSliderInput(this.value)"
-      onchange="onSliderCommit(this.value)" />
   </div>
   <div style="margin-top:12px;">
     <button class="btn" id="mute-btn" onclick="toggleMute()">&#128263; Mute</button>
@@ -123,14 +108,10 @@
 
 <p class="section-label">Input</p>
 <div class="card">
-  <div class="grid2" style="gap:8px;">
+  <div class="grid3">
     <button class="btn btn-input" onclick="setInput(0)" data-i="0">HDMI 1</button>
     <button class="btn btn-input" onclick="setInput(1)" data-i="1">HDMI 2</button>
     <button class="btn btn-input" onclick="setInput(2)" data-i="2">HDMI 3</button>
-    <button class="btn btn-input" onclick="setInput(3)" data-i="3">Aux</button>
-    <button class="btn btn-input" onclick="setInput(4)" data-i="4">Optical</button>
-    <button class="btn btn-input" onclick="setInput(5)" data-i="5">Bluetooth</button>
-    <button class="btn btn-input span2" onclick="setInput(6)" data-i="6">ARC</button>
   </div>
 </div>
 
@@ -141,19 +122,17 @@
   var USER = 'episode';
   var PASS = 'Episode6092';
 
-  var ws       = null;
-  var token    = null;
-  var vol      = 50;
-  var muted    = false;
-  var hbTimer  = null;
-  var hbCount  = 0;
+  var ws             = null;
+  var token          = null;
+  var ready          = false;
+  var vol            = 50;
+  var muted          = false;
+  var hbTimer        = null;
+  var hbCount        = 0;
   var reconnectTimer = null;
-  var volTimer = null;
-  var repeatT  = null;
-  var repeatI  = null;
-  var ready    = false;
+  var repeatT        = null;
+  var repeatI        = null;
 
-  // --- status & toast ---
   function setStatus(state, msg) {
     document.getElementById('dot').className = 'dot' + (state ? ' ' + state : '');
     document.getElementById('status-txt').textContent = msg;
@@ -167,31 +146,23 @@
     t._h = setTimeout(function() { t.classList.remove('show'); }, 2000);
   }
 
-  // --- send (always attaches token) ---
   function send(obj) {
     if (!ws || ws.readyState !== 1) return;
     if (token) obj.token = token;
     ws.send(JSON.stringify(obj));
   }
 
-  // --- heartbeat ---
   function startHeartbeat() {
     clearInterval(hbTimer);
     hbCount = 0;
     hbTimer = setInterval(function() {
       if (!ws || ws.readyState !== 1) return;
       hbCount++;
-      // if 3 heartbeats go unanswered, reconnect
-      if (hbCount > 3) {
-        clearInterval(hbTimer);
-        ws.close();
-        return;
-      }
+      if (hbCount > 3) { clearInterval(hbTimer); ws.close(); return; }
       send({ type: 'heartbeat_request' });
     }, 5000);
   }
 
-  // --- connect ---
   function connect() {
     clearTimeout(reconnectTimer);
     if (ws) { try { ws.close(); } catch(e) {} ws = null; }
@@ -199,16 +170,14 @@
     ready = false;
     setStatus('', 'Connecting...');
 
-    try {
-      ws = new WebSocket('ws://' + HOST + '/ws');
-    } catch(e) {
+    try { ws = new WebSocket('ws://' + HOST + '/ws'); }
+    catch(e) {
       setStatus('err', 'Failed - check WiFi');
       reconnectTimer = setTimeout(connect, 5000);
       return;
     }
 
     ws.onopen = function() {
-      // send login immediately
       ws.send(JSON.stringify({ type: 'login', username: USER, password: PASS }));
     };
 
@@ -216,20 +185,17 @@
       var d;
       try { d = JSON.parse(e.data); } catch(x) { return; }
 
-      // heartbeat response resets count
       if (d.type === 'heartbeat_request') {
         hbCount = 0;
         return;
       }
 
-      // login response - get token then request full state
       if (d.type === 'login') {
         if (d.token) {
           token = d.token;
-          setStatus('on', 'Connected');
           ready = true;
+          setStatus('on', 'Connected');
           startHeartbeat();
-          // request current state
           send({ type: 'in_output_settings', direction: 'get', section: 'all' });
         } else if (d.status === 400) {
           setStatus('err', 'Wrong password');
@@ -237,13 +203,13 @@
         return;
       }
 
-      // state update - sync vol, mute, input
+      // always trust AVR state - it is the source of truth
       if (d.settingInfo) {
         var mv = d.settingInfo.mastervolInfo;
         if (mv) {
           if (mv.master_volume !== undefined) {
             vol = parseInt(mv.master_volume);
-            updateVolUI();
+            document.getElementById('vol-num').textContent = vol;
           }
           if (mv.master_mute !== undefined) {
             muted = mv.master_mute === '1';
@@ -256,18 +222,15 @@
         return;
       }
 
-      // power status feedback
       if (d.type === 'power_status') {
         if (d.status === 'poweron')  toast('Power on');
         if (d.status === 'poweroff') toast('Power off');
         return;
       }
 
-      // session expired - reconnect
       if (d.status === 402 || d.status === 405 || d.status === 408) {
         token = null; ready = false;
         ws.close();
-        return;
       }
     };
 
@@ -289,42 +252,16 @@
     send({ type: 'power_status', status: state });
   }
 
-  // --- volume ---
-  function updateVolUI() {
-    document.getElementById('vol-num').textContent = vol;
-    document.getElementById('vol-slider').value = vol;
-  }
-
-  function nudgeVol(d) {
-    vol = Math.max(0, Math.min(100, vol + d));
-    updateVolUI();
-    scheduleVolSend();
-  }
-
-  function onSliderInput(v) {
-    vol = parseInt(v);
-    document.getElementById('vol-num').textContent = vol;
-  }
-
-  function onSliderCommit(v) {
-    vol = parseInt(v);
-    sendVol();
-  }
-
-  function scheduleVolSend() {
-    clearTimeout(volTimer);
-    volTimer = setTimeout(sendVol, 120);
-  }
-
-  function sendVol() {
-    clearTimeout(volTimer);
+  // --- volume: send delta directly, display updates only from AVR response ---
+  function sendVolDelta(d) {
     if (!ready) return;
+    var newVol = Math.max(0, Math.min(100, vol + d));
     send({
       type: 'in_output_settings',
       direction: 'put',
       section: 'all',
       changed_item: ['master_volume'],
-      items: { master_volume: { index: '0', value: String(vol) } }
+      items: { master_volume: { index: '0', value: String(newVol) } }
     });
   }
 
@@ -338,7 +275,7 @@
       direction: 'put',
       section: 'all',
       changed_item: ['master_mute'],
-      items: { master_mute: muted ? '1' : '0' }
+      items: { master_mute: { index: '0', value: muted ? '1' : '0' } }
     });
   }
 
@@ -367,18 +304,16 @@
     });
   }
 
-  // --- hold to repeat ---
+  // --- hold repeat ---
   function startRepeat(fn) {
     stopRepeat();
-    repeatT = setTimeout(function() { repeatI = setInterval(fn, 100); }, 350);
+    repeatT = setTimeout(function() { repeatI = setInterval(fn, 150); }, 400);
   }
   function stopRepeat() {
     clearTimeout(repeatT);
     clearInterval(repeatI);
-    sendVol();
   }
 
-  // --- go ---
   connect();
 </script>
 </body>
