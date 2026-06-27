@@ -49,7 +49,6 @@
     -webkit-tap-highlight-color: transparent;
   }
   .btn:active { opacity: 0.65; transform: scale(0.97); }
-  .btn.loading { opacity: 0.5; pointer-events: none; }
   .btn-on  { background: var(--green-bg); color: var(--green-text); border-color: transparent; }
   .btn-off { background: var(--red-bg);   color: var(--red-text);   border-color: transparent; }
   .btn-mute-active { background: var(--orange-bg); color: var(--orange-text); border-color: transparent; }
@@ -91,8 +90,8 @@
 <p class="section-label">Power</p>
 <div class="card">
   <div class="grid2">
-    <button class="btn btn-on"  id="btn-poweron"  onclick="setPower(1)">&#9211; On</button>
-    <button class="btn btn-off" id="btn-poweroff" onclick="setPower(0)">&#9211; Off</button>
+    <button class="btn btn-on"  onclick="setPower('poweron')">&#9211; On</button>
+    <button class="btn btn-off" onclick="setPower('poweroff')">&#9211; Off</button>
   </div>
 </div>
 
@@ -138,29 +137,23 @@
 <div id="toast"></div>
 
 <script>
-  var AVR   = 'http://192.168.10.146';
-  var USER  = 'episode';
-  var PASS  = 'Episode6092';
-  var CREDS = btoa(USER + ':' + PASS);
+  var HOST = '192.168.10.146';
+  var USER = 'episode';
+  var PASS = 'Episode6092';
 
-  var vol    = 50;
-  var muted  = false;
-  var repeatT = null;
-  var repeatI = null;
+  var ws       = null;
+  var token    = null;
+  var vol      = 50;
+  var muted    = false;
+  var hbTimer  = null;
+  var hbCount  = 0;
+  var reconnectTimer = null;
   var volTimer = null;
-  var pollTimer = null;
+  var repeatT  = null;
+  var repeatI  = null;
+  var ready    = false;
 
-  function api(payload, cb) {
-    fetch(AVR + '/api', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + CREDS },
-      body: JSON.stringify(payload)
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (cb) cb(d); })
-    .catch(function() { if (cb) cb(null); });
-  }
-
+  // --- status & toast ---
   function setStatus(state, msg) {
     document.getElementById('dot').className = 'dot' + (state ? ' ' + state : '');
     document.getElementById('status-txt').textContent = msg;
@@ -174,41 +167,129 @@
     t._h = setTimeout(function() { t.classList.remove('show'); }, 2000);
   }
 
-  // poll every 5 seconds to keep status fresh
-  function poll() {
-    clearTimeout(pollTimer);
-    api({ type: 'get_mastervolume', value: [0] }, function(r) {
-      if (!r) {
-        setStatus('err', 'Not reachable - check WiFi');
-      } else {
-        setStatus('on', 'Connected');
-        if (r.value && r.value[0]) {
-          vol = parseInt(r.value[0].masterVolume);
-          muted = r.value[0].mute === '1';
-          updateVolUI();
-          updateMuteUI();
+  // --- send (always attaches token) ---
+  function send(obj) {
+    if (!ws || ws.readyState !== 1) return;
+    if (token) obj.token = token;
+    ws.send(JSON.stringify(obj));
+  }
+
+  // --- heartbeat ---
+  function startHeartbeat() {
+    clearInterval(hbTimer);
+    hbCount = 0;
+    hbTimer = setInterval(function() {
+      if (!ws || ws.readyState !== 1) return;
+      hbCount++;
+      // if 3 heartbeats go unanswered, reconnect
+      if (hbCount > 3) {
+        clearInterval(hbTimer);
+        ws.close();
+        return;
+      }
+      send({ type: 'heartbeat_request' });
+    }, 5000);
+  }
+
+  // --- connect ---
+  function connect() {
+    clearTimeout(reconnectTimer);
+    if (ws) { try { ws.close(); } catch(e) {} ws = null; }
+    token = null;
+    ready = false;
+    setStatus('', 'Connecting...');
+
+    try {
+      ws = new WebSocket('ws://' + HOST + '/ws');
+    } catch(e) {
+      setStatus('err', 'Failed - check WiFi');
+      reconnectTimer = setTimeout(connect, 5000);
+      return;
+    }
+
+    ws.onopen = function() {
+      // send login immediately
+      ws.send(JSON.stringify({ type: 'login', username: USER, password: PASS }));
+    };
+
+    ws.onmessage = function(e) {
+      var d;
+      try { d = JSON.parse(e.data); } catch(x) { return; }
+
+      // heartbeat response resets count
+      if (d.type === 'heartbeat_request') {
+        hbCount = 0;
+        return;
+      }
+
+      // login response - get token then request full state
+      if (d.type === 'login') {
+        if (d.token) {
+          token = d.token;
+          setStatus('on', 'Connected');
+          ready = true;
+          startHeartbeat();
+          // request current state
+          send({ type: 'in_output_settings', direction: 'get', section: 'all' });
+        } else if (d.status === 400) {
+          setStatus('err', 'Wrong password');
         }
+        return;
       }
-      pollTimer = setTimeout(poll, 5000);
-    });
+
+      // state update - sync vol, mute, input
+      if (d.settingInfo) {
+        var mv = d.settingInfo.mastervolInfo;
+        if (mv) {
+          if (mv.master_volume !== undefined) {
+            vol = parseInt(mv.master_volume);
+            updateVolUI();
+          }
+          if (mv.master_mute !== undefined) {
+            muted = mv.master_mute === '1';
+            updateMuteUI();
+          }
+          if (mv.input_select !== undefined) {
+            markInput(parseInt(mv.input_select));
+          }
+        }
+        return;
+      }
+
+      // power status feedback
+      if (d.type === 'power_status') {
+        if (d.status === 'poweron')  toast('Power on');
+        if (d.status === 'poweroff') toast('Power off');
+        return;
+      }
+
+      // session expired - reconnect
+      if (d.status === 402 || d.status === 405 || d.status === 408) {
+        token = null; ready = false;
+        ws.close();
+        return;
+      }
+    };
+
+    ws.onerror = function() {
+      setStatus('err', 'Connection error - check WiFi');
+    };
+
+    ws.onclose = function() {
+      clearInterval(hbTimer);
+      ws = null; token = null; ready = false;
+      setStatus('err', 'Reconnecting...');
+      reconnectTimer = setTimeout(connect, 3000);
+    };
   }
 
-  // power
-  function setPower(on) {
-    var btnId = on ? 'btn-poweron' : 'btn-poweroff';
-    var btn = document.getElementById(btnId);
-    btn.classList.add('loading');
-    api({ type: 'set_powerstatus', value: on ? '1' : '0' }, function(r) {
-      btn.classList.remove('loading');
-      if (r && r.status === 200) {
-        toast('Power ' + (on ? 'on' : 'off'));
-      } else {
-        toast('Failed - are you on home WiFi?');
-      }
-    });
+  // --- power ---
+  function setPower(state) {
+    if (!ready) { toast('Not connected'); return; }
+    send({ type: 'power_status', status: state });
   }
 
-  // volume ui
+  // --- volume ---
   function updateVolUI() {
     document.getElementById('vol-num').textContent = vol;
     document.getElementById('vol-slider').value = vol;
@@ -217,7 +298,7 @@
   function nudgeVol(d) {
     vol = Math.max(0, Math.min(100, vol + d));
     updateVolUI();
-    scheduleCommit();
+    scheduleVolSend();
   }
 
   function onSliderInput(v) {
@@ -227,24 +308,38 @@
 
   function onSliderCommit(v) {
     vol = parseInt(v);
-    commitVol();
+    sendVol();
   }
 
-  function scheduleCommit() {
+  function scheduleVolSend() {
     clearTimeout(volTimer);
-    volTimer = setTimeout(commitVol, 150);
+    volTimer = setTimeout(sendVol, 120);
   }
 
-  function commitVol() {
+  function sendVol() {
     clearTimeout(volTimer);
-    api({ type: 'set_mastervolume', value: [{ index: 0, masterVolume: String(vol), mute: muted ? '1' : '0' }] }, null);
+    if (!ready) return;
+    send({
+      type: 'in_output_settings',
+      direction: 'put',
+      section: 'all',
+      changed_item: ['master_volume'],
+      items: { master_volume: { index: '0', value: String(vol) } }
+    });
   }
 
-  // mute
+  // --- mute ---
   function toggleMute() {
+    if (!ready) { toast('Not connected'); return; }
     muted = !muted;
     updateMuteUI();
-    api({ type: 'set_mastervolume', value: [{ index: 0, masterVolume: String(vol), mute: muted ? '1' : '0' }] }, null);
+    send({
+      type: 'in_output_settings',
+      direction: 'put',
+      section: 'all',
+      changed_item: ['master_mute'],
+      items: { master_mute: muted ? '1' : '0' }
+    });
   }
 
   function updateMuteUI() {
@@ -253,10 +348,17 @@
     b.className = 'btn' + (muted ? ' btn-mute-active' : '');
   }
 
-  // input
+  // --- input ---
   function setInput(idx) {
+    if (!ready) { toast('Not connected'); return; }
     markInput(idx);
-    api({ type: 'set_inputsetting', value: [{ index: idx }] }, null);
+    send({
+      type: 'in_output_settings',
+      direction: 'put',
+      section: 'all',
+      changed_item: ['input_select'],
+      items: { input_select: String(idx) }
+    });
   }
 
   function markInput(idx) {
@@ -265,7 +367,7 @@
     });
   }
 
-  // hold repeat
+  // --- hold to repeat ---
   function startRepeat(fn) {
     stopRepeat();
     repeatT = setTimeout(function() { repeatI = setInterval(fn, 100); }, 350);
@@ -273,11 +375,11 @@
   function stopRepeat() {
     clearTimeout(repeatT);
     clearInterval(repeatI);
-    commitVol();
+    sendVol();
   }
 
-  // kick off
-  poll();
+  // --- go ---
+  connect();
 </script>
 </body>
 </html>
