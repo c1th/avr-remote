@@ -1,1 +1,1 @@
-# air-remote
+# avr-remote
