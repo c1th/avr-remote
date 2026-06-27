@@ -12,8 +12,8 @@
   :root {
     --bg: #f2f2f7; --card: #ffffff; --border: #e0e0e5;
     --text: #1c1c1e; --text2: #6c6c70; --text3: #aeaeb2;
-    --green: #34c759; --green-bg: #e8f9ed; --green-text: #1a7a34;
-    --red: #ff3b30; --red-bg: #ffeeed; --red-text: #b02020;
+    --green-bg: #e8f9ed; --green-text: #1a7a34;
+    --red-bg: #ffeeed; --red-text: #b02020;
     --blue: #007aff; --blue-bg: #e5f1ff; --blue-text: #0055cc;
     --orange-bg: #fff4e5; --orange-text: #a05a00;
     --radius: 12px;
@@ -29,43 +29,51 @@
     }
   }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg); color: var(--text);
-    min-height: 100vh;
-    padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 24px);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 32px);
     -webkit-tap-highlight-color: transparent;
   }
-  h1 { font-size: 17px; font-weight: 600; text-align: center; margin: 12px 0 20px; }
+  h1 { font-size: 17px; font-weight: 600; text-align: center; margin: 12px 0 6px; }
   .status-bar { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 20px; font-size: 13px; color: var(--text2); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
-  .dot.on { background: var(--green); }
-  .dot.err { background: var(--red); }
-  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; margin-bottom: 14px; }
+  .dot.on { background: #34c759; }
+  .dot.err { background: #ff3b30; }
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; padding-left: 2px; }
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; margin-bottom: 14px; }
   .btn {
     display: flex; align-items: center; justify-content: center; gap: 7px;
     padding: 14px; border-radius: 10px; border: 1px solid var(--border);
     background: var(--bg); color: var(--text); font-size: 15px; font-weight: 500;
-    cursor: pointer; transition: opacity 0.1s, transform 0.1s;
-    -webkit-tap-highlight-color: transparent; width: 100%;
+    cursor: pointer; width: 100%; transition: opacity 0.1s, transform 0.08s;
+    -webkit-tap-highlight-color: transparent;
   }
-  .btn:active { opacity: 0.7; transform: scale(0.97); }
-  .btn-on  { background: var(--green-bg);  color: var(--green-text);  border-color: transparent; }
-  .btn-off { background: var(--red-bg);    color: var(--red-text);    border-color: transparent; }
+  .btn:active { opacity: 0.65; transform: scale(0.97); }
+  .btn.loading { opacity: 0.5; pointer-events: none; }
+  .btn-on  { background: var(--green-bg); color: var(--green-text); border-color: transparent; }
+  .btn-off { background: var(--red-bg);   color: var(--red-text);   border-color: transparent; }
   .btn-mute-active { background: var(--orange-bg); color: var(--orange-text); border-color: transparent; }
   .btn-input-active { background: var(--blue-bg); color: var(--blue-text); border-color: transparent; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .span2 { grid-column: span 2; }
-  .vol-row { display: grid; grid-template-columns: 60px 1fr 60px; gap: 12px; align-items: center; }
+  .vol-row { display: grid; grid-template-columns: 64px 1fr 64px; gap: 10px; align-items: center; }
   .vol-center { text-align: center; }
-  .vol-num { font-size: 36px; font-weight: 300; line-height: 1; }
+  .vol-num { font-size: 40px; font-weight: 200; line-height: 1; }
   .vol-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
-  .btn-circle { width: 58px; height: 58px; border-radius: 50%; font-size: 22px; padding: 0; }
-  .btn-connect { background: var(--blue); color: #fff; border-color: transparent; font-weight: 600; }
+  .btn-circle { width: 62px; height: 62px; border-radius: 50%; font-size: 24px; padding: 0; }
+  .vol-slider-wrap { margin-top: 14px; padding: 0 4px; }
+  input[type=range] {
+    width: 100%; height: 6px; -webkit-appearance: none; appearance: none;
+    background: var(--border); border-radius: 3px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--blue); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
   #toast {
     position: fixed; bottom: calc(env(safe-area-inset-bottom, 16px) + 16px);
     left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.78); color: #fff; font-size: 13px;
+    background: rgba(0,0,0,0.82); color: #fff; font-size: 13px;
     padding: 9px 18px; border-radius: 20px; white-space: nowrap;
     opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 999;
   }
@@ -75,22 +83,16 @@
 <body>
 
 <h1>Episode Mini AVR</h1>
-
 <div class="status-bar">
   <div class="dot" id="dot"></div>
-  <span id="status-txt">Tap connect to start</span>
-</div>
-
-<p class="section-label">Connection</p>
-<div class="card">
-  <button class="btn btn-connect" onclick="connect()" id="conn-btn">Connect</button>
+  <span id="status-txt">Connecting...</span>
 </div>
 
 <p class="section-label">Power</p>
 <div class="card">
   <div class="grid2">
-    <button class="btn btn-on"  onclick="sendPower('poweron')">⏻ On</button>
-    <button class="btn btn-off" onclick="sendPower('poweroff')">⏻ Off</button>
+    <button class="btn btn-on"  id="btn-poweron"  onclick="setPower(1)">&#9211; On</button>
+    <button class="btn btn-off" id="btn-poweroff" onclick="setPower(0)">&#9211; Off</button>
   </div>
 </div>
 
@@ -98,20 +100,25 @@
 <div class="card">
   <div class="vol-row">
     <button class="btn btn-circle"
-      onclick="changeVol(-1)"
-      onpointerdown="startRepeat(() => changeVol(-1))"
-      onpointerup="stopRepeat()" onpointerleave="stopRepeat()">−</button>
+      onclick="nudgeVol(-1)"
+      onpointerdown="startRepeat(function(){ nudgeVol(-1); })"
+      onpointerup="stopRepeat()" onpointerleave="stopRepeat()">&#8722;</button>
     <div class="vol-center">
-      <div class="vol-num" id="vol-num">—</div>
+      <div class="vol-num" id="vol-num">&#8212;</div>
       <div class="vol-sub">volume</div>
     </div>
     <button class="btn btn-circle"
-      onclick="changeVol(1)"
-      onpointerdown="startRepeat(() => changeVol(1))"
+      onclick="nudgeVol(1)"
+      onpointerdown="startRepeat(function(){ nudgeVol(1); })"
       onpointerup="stopRepeat()" onpointerleave="stopRepeat()">+</button>
   </div>
+  <div class="vol-slider-wrap">
+    <input type="range" id="vol-slider" min="0" max="100" value="50"
+      oninput="onSliderInput(this.value)"
+      onchange="onSliderCommit(this.value)" />
+  </div>
   <div style="margin-top:12px;">
-    <button class="btn" id="mute-btn" onclick="toggleMute()">🔇 Mute</button>
+    <button class="btn" id="mute-btn" onclick="toggleMute()">&#128263; Mute</button>
   </div>
 </div>
 
@@ -131,16 +138,28 @@
 <div id="toast"></div>
 
 <script>
-  const AVR_IP = '192.168.10.146';
-  const USER   = 'episode';
-  const PASS   = 'Episode6092';
-  const TOKEN  = '7e445d3d72394f2b819b4ee0de94ec2c';
+  var AVR   = 'http://192.168.10.146';
+  var USER  = 'episode';
+  var PASS  = 'Episode6092';
+  var CREDS = btoa(USER + ':' + PASS);
 
-  let ws = null;
-  let vol = 50;
-  let muted = false;
-  let hbTimer = null;
-  let repeatT = null, repeatI = null;
+  var vol    = 50;
+  var muted  = false;
+  var repeatT = null;
+  var repeatI = null;
+  var volTimer = null;
+  var pollTimer = null;
+
+  function api(payload, cb) {
+    fetch(AVR + '/api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + CREDS },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (cb) cb(d); })
+    .catch(function() { if (cb) cb(null); });
+  }
 
   function setStatus(state, msg) {
     document.getElementById('dot').className = 'dot' + (state ? ' ' + state : '');
@@ -148,149 +167,117 @@
   }
 
   function toast(msg) {
-    const t = document.getElementById('toast');
+    var t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    clearTimeout(t._hide);
-    t._hide = setTimeout(() => t.classList.remove('show'), 2200);
+    clearTimeout(t._h);
+    t._h = setTimeout(function() { t.classList.remove('show'); }, 2000);
   }
 
-  async function connect() {
-    if (ws) { ws.close(); ws = null; clearTimeout(hbTimer); }
-    setStatus('', 'Connecting…');
-    document.getElementById('conn-btn').textContent = 'Connecting…';
-
-    // first, fetch the login page with basic auth credentials to establish the session
-    try {
-      await fetch(`http://${USER}:${PASS}@${AVR_IP}/snapav_5.1_web/login.htm`, {
-        method: 'GET', credentials: 'include', mode: 'no-cors'
-      });
-    } catch(e) {
-      // no-cors fetch may "fail" but still sends the request and sets the session — continue
-    }
-
-    openWebSocket();
-  }
-
-  function openWebSocket() {
-    try {
-      ws = new WebSocket(`ws://${AVR_IP}/ws`);
-    } catch(e) {
-      setStatus('err', 'Failed to connect');
-      document.getElementById('conn-btn').textContent = 'Retry';
-      return;
-    }
-
-    ws.onopen = () => {
-      setStatus('on', 'Connected');
-      document.getElementById('conn-btn').textContent = 'Reconnect';
-      // send token and request full settings
-      ws.send(JSON.stringify({ type: 'configure_settings', direction: 'get', section: 'all', token: TOKEN }));
-      scheduleHB();
-    };
-
-    ws.onmessage = (e) => {
-      try {
-        const d = JSON.parse(e.data);
-        // handle settings response
-        if (d.settingInfo) {
-          const mv = d.settingInfo.mastervolInfo;
-          if (mv) {
-            if (mv.master_volume !== undefined) { vol = parseInt(mv.master_volume); updateVol(); }
-            if (mv.master_mute   !== undefined) { muted = mv.master_mute === '1'; updateMute(); }
-            if (mv.input_select  !== undefined) { markInput(parseInt(mv.input_select)); }
-          }
+  // poll every 5 seconds to keep status fresh
+  function poll() {
+    clearTimeout(pollTimer);
+    api({ type: 'get_mastervolume', value: [0] }, function(r) {
+      if (!r) {
+        setStatus('err', 'Not reachable - check WiFi');
+      } else {
+        setStatus('on', 'Connected');
+        if (r.value && r.value[0]) {
+          vol = parseInt(r.value[0].masterVolume);
+          muted = r.value[0].mute === '1';
+          updateVolUI();
+          updateMuteUI();
         }
-        // handle power status updates
-        if (d.type === 'power_status') {
-          toast('Power ' + (d.status === 'poweron' ? 'on' : 'off'));
-        }
-        // redirect to login means session expired
-        if (d.status === '402' || d.status === '405' || d.status === '408') {
-          setStatus('err', 'Session expired — tap Reconnect');
-          ws.close();
-        }
-      } catch(_) {}
-    };
-
-    ws.onerror = () => {
-      setStatus('err', 'Connection error — tap Reconnect');
-      document.getElementById('conn-btn').textContent = 'Retry';
-    };
-
-    ws.onclose = () => {
-      setStatus('', 'Disconnected — tap Reconnect');
-      ws = null;
-      clearTimeout(hbTimer);
-      document.getElementById('conn-btn').textContent = 'Reconnect';
-    };
-  }
-
-  function scheduleHB() {
-    hbTimer = setTimeout(() => {
-      if (ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({ type: 'heartbeat_request', token: TOKEN }));
-        scheduleHB();
       }
-    }, 5000);
+      pollTimer = setTimeout(poll, 5000);
+    });
   }
 
-  function send(obj) {
-    if (!ws || ws.readyState !== 1) { toast('Not connected'); return; }
-    ws.send(JSON.stringify(obj));
+  // power
+  function setPower(on) {
+    var btnId = on ? 'btn-poweron' : 'btn-poweroff';
+    var btn = document.getElementById(btnId);
+    btn.classList.add('loading');
+    api({ type: 'set_powerstatus', value: on ? '1' : '0' }, function(r) {
+      btn.classList.remove('loading');
+      if (r && r.status === 200) {
+        toast('Power ' + (on ? 'on' : 'off'));
+      } else {
+        toast('Failed - are you on home WiFi?');
+      }
+    });
   }
 
-  function sendPower(state) {
-    send({ type: 'power_status', status: state, token: TOKEN });
+  // volume ui
+  function updateVolUI() {
+    document.getElementById('vol-num').textContent = vol;
+    document.getElementById('vol-slider').value = vol;
   }
 
-  function updateVol() {
+  function nudgeVol(d) {
+    vol = Math.max(0, Math.min(100, vol + d));
+    updateVolUI();
+    scheduleCommit();
+  }
+
+  function onSliderInput(v) {
+    vol = parseInt(v);
     document.getElementById('vol-num').textContent = vol;
   }
 
-  function changeVol(d) {
-    vol = Math.max(0, Math.min(100, vol + d));
-    updateVol();
-    send({ type: 'in_output_settings', direction: 'put', section: 'all',
-           changed_item: ['master_volume'],
-           items: { master_volume: { index: '0', value: String(vol) } },
-           token: TOKEN });
+  function onSliderCommit(v) {
+    vol = parseInt(v);
+    commitVol();
   }
 
+  function scheduleCommit() {
+    clearTimeout(volTimer);
+    volTimer = setTimeout(commitVol, 150);
+  }
+
+  function commitVol() {
+    clearTimeout(volTimer);
+    api({ type: 'set_mastervolume', value: [{ index: 0, masterVolume: String(vol), mute: muted ? '1' : '0' }] }, null);
+  }
+
+  // mute
   function toggleMute() {
     muted = !muted;
-    send({ type: 'in_output_settings', direction: 'put', section: 'all',
-           changed_item: ['master_mute'],
-           items: { master_mute: muted ? '1' : '0' },
-           token: TOKEN });
-    updateMute();
+    updateMuteUI();
+    api({ type: 'set_mastervolume', value: [{ index: 0, masterVolume: String(vol), mute: muted ? '1' : '0' }] }, null);
   }
 
-  function updateMute() {
-    const b = document.getElementById('mute-btn');
-    b.textContent = muted ? '🔇 Unmute' : '🔇 Mute';
+  function updateMuteUI() {
+    var b = document.getElementById('mute-btn');
+    b.innerHTML = muted ? '&#128263; Unmute' : '&#128263; Mute';
     b.className = 'btn' + (muted ? ' btn-mute-active' : '');
   }
 
+  // input
   function setInput(idx) {
-    send({ type: 'in_output_settings', direction: 'put', section: 'all',
-           changed_item: ['input_select'],
-           items: { input_select: String(idx) },
-           token: TOKEN });
     markInput(idx);
+    api({ type: 'set_inputsetting', value: [{ index: idx }] }, null);
   }
 
   function markInput(idx) {
-    document.querySelectorAll('.btn-input').forEach(b => {
+    document.querySelectorAll('.btn-input').forEach(function(b) {
       b.className = 'btn btn-input' + (parseInt(b.dataset.i) === idx ? ' btn-input-active' : '');
     });
   }
 
-  function startRepeat(fn) { stopRepeat(); repeatT = setTimeout(() => { repeatI = setInterval(fn, 110); }, 380); }
-  function stopRepeat() { clearTimeout(repeatT); clearInterval(repeatI); }
+  // hold repeat
+  function startRepeat(fn) {
+    stopRepeat();
+    repeatT = setTimeout(function() { repeatI = setInterval(fn, 100); }, 350);
+  }
+  function stopRepeat() {
+    clearTimeout(repeatT);
+    clearInterval(repeatI);
+    commitVol();
+  }
 
-  // auto-connect on load
-  window.addEventListener('load', connect);
+  // kick off
+  poll();
 </script>
 </body>
 </html>
