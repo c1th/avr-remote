@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="AVR Remote" />
+<title>AVR Remote</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f2f2f7; --card: #ffffff; --border: #e0e0e5;
+    --text: #1c1c1e; --text2: #6c6c70; --text3: #aeaeb2;
+    --green: #34c759; --green-bg: #e8f9ed; --green-text: #1a7a34;
+    --red: #ff3b30; --red-bg: #ffeeed; --red-text: #b02020;
+    --blue: #007aff; --blue-bg: #e5f1ff; --blue-text: #0055cc;
+    --orange-bg: #fff4e5; --orange-text: #a05a00;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --card: #2c2c2e; --border: #3a3a3c;
+      --text: #ffffff; --text2: #aeaeb2; --text3: #636366;
+      --green-bg: #0d3320; --green-text: #34c759;
+      --red-bg: #3b1010; --red-text: #ff6b63;
+      --blue-bg: #0a2a50; --blue-text: #4da3ff;
+      --orange-bg: #3b2200; --orange-text: #ffaa33;
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh;
+    padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 24px);
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1 { font-size: 17px; font-weight: 600; text-align: center; margin: 12px 0 20px; }
+  .status-bar { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 20px; font-size: 13px; color: var(--text2); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
+  .dot.on { background: var(--green); }
+  .dot.err { background: var(--red); }
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; margin-bottom: 14px; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; padding-left: 2px; }
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.1s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent; width: 100%;
+  }
+  .btn:active { opacity: 0.7; transform: scale(0.97); }
+  .btn-on  { background: var(--green-bg);  color: var(--green-text);  border-color: transparent; }
+  .btn-off { background: var(--red-bg);    color: var(--red-text);    border-color: transparent; }
+  .btn-mute-active { background: var(--orange-bg); color: var(--orange-text); border-color: transparent; }
+  .btn-input-active { background: var(--blue-bg); color: var(--blue-text); border-color: transparent; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .span2 { grid-column: span 2; }
+  .vol-row { display: grid; grid-template-columns: 60px 1fr 60px; gap: 12px; align-items: center; }
+  .vol-center { text-align: center; }
+  .vol-num { font-size: 36px; font-weight: 300; line-height: 1; }
+  .vol-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .btn-circle { width: 58px; height: 58px; border-radius: 50%; font-size: 22px; padding: 0; }
+  .btn-connect { background: var(--blue); color: #fff; border-color: transparent; font-weight: 600; }
+  #toast {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom, 16px) + 16px);
+    left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.78); color: #fff; font-size: 13px;
+    padding: 9px 18px; border-radius: 20px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>Episode Mini AVR</h1>
+
+<div class="status-bar">
+  <div class="dot" id="dot"></div>
+  <span id="status-txt">Tap connect to start</span>
+</div>
+
+<p class="section-label">Connection</p>
+<div class="card">
+  <button class="btn btn-connect" onclick="connect()" id="conn-btn">Connect</button>
+</div>
+
+<p class="section-label">Power</p>
+<div class="card">
+  <div class="grid2">
+    <button class="btn btn-on"  onclick="sendPower('poweron')">⏻ On</button>
+    <button class="btn btn-off" onclick="sendPower('poweroff')">⏻ Off</button>
+  </div>
+</div>
+
+<p class="section-label">Volume</p>
+<div class="card">
+  <div class="vol-row">
+    <button class="btn btn-circle"
+      onclick="changeVol(-1)"
+      onpointerdown="startRepeat(() => changeVol(-1))"
+      onpointerup="stopRepeat()" onpointerleave="stopRepeat()">−</button>
+    <div class="vol-center">
+      <div class="vol-num" id="vol-num">—</div>
+      <div class="vol-sub">volume</div>
+    </div>
+    <button class="btn btn-circle"
+      onclick="changeVol(1)"
+      onpointerdown="startRepeat(() => changeVol(1))"
+      onpointerup="stopRepeat()" onpointerleave="stopRepeat()">+</button>
+  </div>
+  <div style="margin-top:12px;">
+    <button class="btn" id="mute-btn" onclick="toggleMute()">🔇 Mute</button>
+  </div>
+</div>
+
+<p class="section-label">Input</p>
+<div class="card">
+  <div class="grid2" style="gap:8px;">
+    <button class="btn btn-input" onclick="setInput(0)" data-i="0">HDMI 1</button>
+    <button class="btn btn-input" onclick="setInput(1)" data-i="1">HDMI 2</button>
+    <button class="btn btn-input" onclick="setInput(2)" data-i="2">HDMI 3</button>
+    <button class="btn btn-input" onclick="setInput(3)" data-i="3">Aux</button>
+    <button class="btn btn-input" onclick="setInput(4)" data-i="4">Optical</button>
+    <button class="btn btn-input" onclick="setInput(5)" data-i="5">Bluetooth</button>
+    <button class="btn btn-input span2" onclick="setInput(6)" data-i="6">ARC</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const AVR_IP = '192.168.10.146';
+  const USER   = 'episode';
+  const PASS   = 'Episode6092';
+  const TOKEN  = '7e445d3d72394f2b819b4ee0de94ec2c';
+
+  let ws = null;
+  let vol = 50;
+  let muted = false;
+  let hbTimer = null;
+  let repeatT = null, repeatI = null;
+
+  function setStatus(state, msg) {
+    document.getElementById('dot').className = 'dot' + (state ? ' ' + state : '');
+    document.getElementById('status-txt').textContent = msg;
+  }
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._hide);
+    t._hide = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  async function connect() {
+    if (ws) { ws.close(); ws = null; clearTimeout(hbTimer); }
+    setStatus('', 'Connecting…');
+    document.getElementById('conn-btn').textContent = 'Connecting…';
+
+    // first, fetch the login page with basic auth credentials to establish the session
+    try {
+      await fetch(`http://${USER}:${PASS}@${AVR_IP}/snapav_5.1_web/login.htm`, {
+        method: 'GET', credentials: 'include', mode: 'no-cors'
+      });
+    } catch(e) {
+      // no-cors fetch may "fail" but still sends the request and sets the session — continue
+    }
+
+    openWebSocket();
+  }
+
+  function openWebSocket() {
+    try {
+      ws = new WebSocket(`ws://${AVR_IP}/ws`);
+    } catch(e) {
+      setStatus('err', 'Failed to connect');
+      document.getElementById('conn-btn').textContent = 'Retry';
+      return;
+    }
+
+    ws.onopen = () => {
+      setStatus('on', 'Connected');
+      document.getElementById('conn-btn').textContent = 'Reconnect';
+      // send token and request full settings
+      ws.send(JSON.stringify({ type: 'configure_settings', direction: 'get', section: 'all', token: TOKEN }));
+      scheduleHB();
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        // handle settings response
+        if (d.settingInfo) {
+          const mv = d.settingInfo.mastervolInfo;
+          if (mv) {
+            if (mv.master_volume !== undefined) { vol = parseInt(mv.master_volume); updateVol(); }
+            if (mv.master_mute   !== undefined) { muted = mv.master_mute === '1'; updateMute(); }
+            if (mv.input_select  !== undefined) { markInput(parseInt(mv.input_select)); }
+          }
+        }
+        // handle power status updates
+        if (d.type === 'power_status') {
+          toast('Power ' + (d.status === 'poweron' ? 'on' : 'off'));
+        }
+        // redirect to login means session expired
+        if (d.status === '402' || d.status === '405' || d.status === '408') {
+          setStatus('err', 'Session expired — tap Reconnect');
+          ws.close();
+        }
+      } catch(_) {}
+    };
+
+    ws.onerror = () => {
+      setStatus('err', 'Connection error — tap Reconnect');
+      document.getElementById('conn-btn').textContent = 'Retry';
+    };
+
+    ws.onclose = () => {
+      setStatus('', 'Disconnected — tap Reconnect');
+      ws = null;
+      clearTimeout(hbTimer);
+      document.getElementById('conn-btn').textContent = 'Reconnect';
+    };
+  }
+
+  function scheduleHB() {
+    hbTimer = setTimeout(() => {
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'heartbeat_request', token: TOKEN }));
+        scheduleHB();
+      }
+    }, 5000);
+  }
+
+  function send(obj) {
+    if (!ws || ws.readyState !== 1) { toast('Not connected'); return; }
+    ws.send(JSON.stringify(obj));
+  }
+
+  function sendPower(state) {
+    send({ type: 'power_status', status: state, token: TOKEN });
+  }
+
+  function updateVol() {
+    document.getElementById('vol-num').textContent = vol;
+  }
+
+  function changeVol(d) {
+    vol = Math.max(0, Math.min(100, vol + d));
+    updateVol();
+    send({ type: 'in_output_settings', direction: 'put', section: 'all',
+           changed_item: ['master_volume'],
+           items: { master_volume: { index: '0', value: String(vol) } },
+           token: TOKEN });
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    send({ type: 'in_output_settings', direction: 'put', section: 'all',
+           changed_item: ['master_mute'],
+           items: { master_mute: muted ? '1' : '0' },
+           token: TOKEN });
+    updateMute();
+  }
+
+  function updateMute() {
+    const b = document.getElementById('mute-btn');
+    b.textContent = muted ? '🔇 Unmute' : '🔇 Mute';
+    b.className = 'btn' + (muted ? ' btn-mute-active' : '');
+  }
+
+  function setInput(idx) {
+    send({ type: 'in_output_settings', direction: 'put', section: 'all',
+           changed_item: ['input_select'],
+           items: { input_select: String(idx) },
+           token: TOKEN });
+    markInput(idx);
+  }
+
+  function markInput(idx) {
+    document.querySelectorAll('.btn-input').forEach(b => {
+      b.className = 'btn btn-input' + (parseInt(b.dataset.i) === idx ? ' btn-input-active' : '');
+    });
+  }
+
+  function startRepeat(fn) { stopRepeat(); repeatT = setTimeout(() => { repeatI = setInterval(fn, 110); }, 380); }
+  function stopRepeat() { clearTimeout(repeatT); clearInterval(repeatI); }
+
+  // auto-connect on load
+  window.addEventListener('load', connect);
+</script>
+</body>
+</html>
